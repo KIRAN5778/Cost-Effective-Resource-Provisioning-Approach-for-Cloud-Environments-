@@ -37,13 +37,13 @@ public class ServerConstants {
 	public static final String db_url = "jdbc:mysql://localhost/cloudability";
 
 
-	public static String accessKey = "AKIAJJCFCRYM3OHOXEYA";
-	public static String secretKey = "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";
+	public static String accessKey = "**";
+	public static String secretKey = "**";
 
 	/*
-	 * public static final String accessKey = "AKIAJL6TETCJIZQYIVMA"; public
+	 * public static final String accessKey = "**"; public
 	 * static final String secretKey =
-	 * "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";
+	 * "**";
 	 */
 	public static List<Regions> workingRegions() {
 		Regions[] regions = Regions.values();
