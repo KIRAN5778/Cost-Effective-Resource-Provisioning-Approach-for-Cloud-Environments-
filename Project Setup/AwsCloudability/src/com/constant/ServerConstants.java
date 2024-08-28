@@ -36,14 +36,8 @@ public class ServerConstants {
 	public static final String db_pwd = "";
 	public static final String db_url = "jdbc:mysql://localhost/cloudability";
 
-
-	public static String accessKey = "**";
-	public static String secretKey = "**";
-
-	/*
-	 * public static final String accessKey = "**"; public
-	 * static final String secretKey =
-	 * "**";
+/*
+	add two keys here
 	 */
 	public static List<Regions> workingRegions() {
 		Regions[] regions = Regions.values();
