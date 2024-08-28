@@ -1,0 +1,571 @@
+/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.database;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.modelmapper.ModelMapper;
+
+import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.Volume;
+import com.constant.ServerConstants;
+import com.helper.AWSStatistics;
+import com.helper.DBUtils;
+import com.helper.DateHelper;
+import com.helper.GraphModel;
+import com.helper.InstanceUserModel;
+import com.helper.SimpleCryptoAndroidJava;
+import com.helper.StringHelper;
+import com.helper.UserModel;
+
+/**
+ * 
+ * @author Admin
+ */
+public class ConnectionManager extends DBUtils {
+	public static HashMap clickStreamingMap = new HashMap();
+
+	// static {
+	// reloadClickStreaming();
+	// }
+
+	public static void reloadClickStreaming() {
+		// clickStreamingMap = ConnectionManager
+		// .getQueryMap("SELECT distinct  domain,cate FROM clickstreaming where length(coalesce(cate,''))>3");
+	}
+
+	public static Connection getDBConnection() {
+		Connection conn = null;
+		try {
+			Class.forName(ServerConstants.db_driver);
+			conn = DriverManager.getConnection(ServerConstants.db_url,
+					ServerConstants.db_user, ServerConstants.db_pwd);
+			System.out.println("Got Connection");
+		} catch (SQLException ex) {
+			ex.printStackTrace();
+			// JOptionPane.showMessageDialog(
+			// null,
+			// "Please start the mysql Service from XAMPP Console.\n"
+			// + ex.getMessage());
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		return conn;
+	}
+
+	public static UserModel checkLogin(HashMap parameters) {
+		String username = StringHelper.n2s(parameters.get("username"));
+		String pass = StringHelper.n2s(parameters.get("pass"));
+		if (pass.length() > 0) {
+			try {
+				pass = SimpleCryptoAndroidJava.encryptString(pass);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		String query = "SELECT * FROM useraccounts where username like ? and pass = ?";
+		UserModel um = null;
+		List list = DBUtils.getBeanList(UserModel.class, query, username, pass);
+		System.out.println("list size:" + list.size());
+		if (list.size() > 0) {
+			um = (UserModel) list.get(0);
+		}
+		return um;
+	}
+
+	public static List getAllUsers() {
+		String query = "SELECT * FROM useraccounts ";
+		UserModel um = null;
+		List list = DBUtils.getBeanList(UserModel.class, query);
+		System.out.println("list size:" + list.size());
+
+		return list;
+	}
+
+	public static List getUserWiseNode(String uid) {
+		String query = "select DISTINCT * from awsnode where userid = " + uid;
+		UserModel um = null;
+		List list = DBUtils.getBeanList(InstanceUserModel.class, query);
+		System.out.println("list size:" + list.size());
+
+		return list;
+
+	}
+
+	public static String insertUser(HashMap parameters) {
+		System.out.println(parameters);
+		String success = "";
+
+		String fname = StringHelper.n2s(parameters.get("fname"));
+		String lname = StringHelper.n2s(parameters.get("lname"));
+		String phoneno = StringHelper.n2s(parameters.get("phoneno"));
+		String userpass = StringHelper.n2s(parameters.get("userpass"));
+		;
+		String regions = StringHelper.n2s(parameters.get("regions"));
+		String accessKey = StringHelper.n2s(parameters.get("accessKey"));
+		String accessSecret = StringHelper.n2s(parameters.get("accessSecret"));
+		
+		
+		;
+		try {
+			userpass = SimpleCryptoAndroidJava.encryptString(StringHelper
+					.n2s(parameters.get("userpass")));
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		String username = StringHelper.n2s(parameters.get("username"));
+
+		String data = "Select 1 from useraccounts where phoneno like '"
+				+ phoneno + "' OR username like '" + username + "'";
+		boolean v = DBUtils.dataExists(data);
+		if (!v) {
+			String sql = "insert into useraccounts (fname, lname, phoneno, pass, username,region,accesskey, secretkey)  "
+					+ "	values(?,?,?,?,?,?,?,?)";
+			int list = DBUtils.executeUpdate(sql, fname, lname, phoneno,
+					userpass, username, regions,accessKey,accessSecret);
+			if (list > 0) {
+				success = "User registered Successfully";
+   
+			} else {
+				success = "Error adding user to database";
+			}
+		} else {
+			success = "Duplicate user name or phone No";
+		}
+		return success;
+	}
+
+	public static void main(String[] args) {
+		// getDBConnection();
+		// getGraphData();
+		// getEbsGraphData();
+		// getPidata();
+		// getDecisionData();
+		// getUserWiseNode("1");
+		// getDecisionData();
+		getVolumes("1");
+		// System.out.println(l);
+		// for (int i = 0; i < l.size(); i++) {
+		// GraphModel gm = (GraphModel) l.get(i);
+		// System.out.println(gm.getMaxDate());
+		//
+		// }
+	}
+
+	public static List getGraphData() {
+		String query = "SELECT tagName,instanceId,Group_Concat(tagValue separator ',') as valuess,Group_Concat(`event_date` separator ',') as dates  FROM `awsstatistics`  where userid=1 and instanceid like 'i-%' and tagName like 'CPU%' group by tagName,instanceId order by `event_date`";
+		GraphModel gm = null;
+		List list = DBUtils.getBeanList(GraphModel.class, query);
+		System.out.println("list size:" + list.size());
+		for (int i = 0; i < list.size(); i++) {
+			GraphModel gm1 = (GraphModel) list.get(i);
+			System.out.println("values :: " + gm1.getValuess());
+			System.out.println("values :: " + gm1.getDates());
+
+			/*
+			 * String date1=gm1.getDates();
+			 * 
+			 * String[] dates=date1.split(",");
+			 * 
+			 * System.out.println(" after split");
+			 * 
+			 * String afterUpdate=""; for(int j=dates.length-1;j>=0;j--) {
+			 * System.out.println(" dates"+dates[j] );
+			 * 
+			 * afterUpdate=afterUpdate+dates[j]+","; }
+			 * 
+			 * System.out.println("****   "+afterUpdate);
+			 */
+
+			String value1 = gm1.getValuess();
+			String[] values2 = value1.split(",");
+
+			String valueUpdate = "";
+
+			for (int k = values2.length - 1; k >= 0; k--) {
+				System.out.println("value ::   " + values2[k]);
+				valueUpdate = valueUpdate + values2[k] + ",";
+			}
+
+			System.out.println("****   " + valueUpdate);
+			if (valueUpdate.endsWith(",")) {
+				int length = valueUpdate.length();
+				valueUpdate = valueUpdate.substring(0, length - 1);
+			}
+			System.out.println("****   " + valueUpdate);
+			/*
+			 * String valueUpdate2=method(valueUpdate);
+			 * System.out.println("valueUpdate 2 "+valueUpdate2);
+			 */
+		}
+
+		return list;
+	}
+
+	public static List<HashMap> getGraphDBData(String userId,
+			String parameterName, int maxDays, String dateFormat) {
+		// %d-%b
+		String querye = "select a.instanceId,group_concat( date_format(event_date,'"
+				+ dateFormat
+				+ "') separator ',') as event_date ,group_concat( tagValue separator ',') as tagValue FROM awsstatistics a where  "
+				+ "a.userid="+userId+" and a.tagName like '"+parameterName+"' and a.`event_date` >(DATE(NOW()) - INTERVAL "+maxDays+" DAY) "
+				+ " group by a.userid,a.tagName,a.instanceId";
+		List<HashMap> data = getMapList(querye);
+		return data;
+
+	}
+
+	public static Object[] filterData(List<HashMap> cpuData, String InstanceId) {
+
+		Object[] data = cpuData
+				.stream()
+				.filter(map -> {
+					return StringHelper.n2s(map.get("instanceId"))
+							.equalsIgnoreCase(InstanceId);
+				}).toArray();
+
+		return data;
+	}
+
+	public static List getPidata() {
+		List l = new ArrayList<>();
+		String tagvalue = "";
+		String dates = "";
+		String query = "SELECT DISTINCT statsid,tagName,max(event_date) as dates,instanceId,tagValue FROM `awsstatistics` where tagName ='CPUUtilization' group by instanceId";
+		GraphModel gm = null;
+		List list = DBUtils.getBeanList(GraphModel.class, query);
+		System.out.println("list size:" + list.size());
+		for (int i = 0; i < list.size(); i++) {
+			GraphModel gm1 = (GraphModel) list.get(i);
+
+			tagvalue += gm1.getTagValue() + ",";
+
+			dates += gm1.getDates() + ",";
+			// System.out.println("values :: " + gm1.getTagValue());
+			// System.out.println("values :: " + gm1.getDates();
+		}
+		int Vlength = tagvalue.length();
+		if (tagvalue.endsWith(",")) {
+			tagvalue = tagvalue.substring(0, Vlength - 1);
+		}
+
+		int Dlength = dates.length();
+		if (dates.endsWith(",")) {
+			dates = dates.substring(0, Dlength - 1);
+		}
+		System.out.println("values :: " + tagvalue);
+		System.out.println("values :: " + dates);
+
+		l.add(tagvalue);
+		l.add(dates);
+
+		/*
+		 * String date1=gm1.getDates();
+		 * 
+		 * String[] dates=date1.split(",");
+		 * 
+		 * System.out.println(" after split");
+		 * 
+		 * String afterUpdate=""; for(int j=dates.length-1;j>=0;j--) {
+		 * System.out.println(" dates"+dates[j] );
+		 * 
+		 * afterUpdate=afterUpdate+dates[j]+","; }
+		 * 
+		 * System.out.println("****   "+afterUpdate);
+		 */
+
+		/*
+		 * String value1 = gm1.getTagValue(); //String[] values2 =
+		 * value1.split(",");
+		 * 
+		 * String valueUpdate = "";
+		 * 
+		 * for (int k = values2.length - 1; k >= 0; k--) {
+		 * System.out.println("value ::   " + values2[k]); valueUpdate =
+		 * valueUpdate + values2[k] + ","; }
+		 * 
+		 * System.out.println("****   " + valueUpdate); if
+		 * (valueUpdate.endsWith(",")) { int length = valueUpdate.length();
+		 * valueUpdate = valueUpdate.substring(0, length - 1); }
+		 */
+		// System.out.println("****   " + valueUpdate);
+
+		// String valueUpdate2=method(valueUpdate);
+		// System.out.println("valueUpdate 2 "+valueUpdate2);
+
+		return l;
+	}
+
+	public static List getEbsGraphData() {
+		String query = "SELECT tagName,instanceId,Group_Concat(tagValue separator ',') as valuess,Group_Concat(`event_date` separator ',') as dates FROM `awsstatistics`  where userid=1 and instanceid like 'vol-%' and tagName like 'VolumeReadBytes%' group by tagName,instanceId order by `event_date`";
+		GraphModel gm = null;
+		List list = DBUtils.getBeanList(GraphModel.class, query);
+		System.out.println("list size:" + list.size());
+		for (int i = 0; i < list.size(); i++) {
+			GraphModel gm1 = (GraphModel) list.get(i);
+			System.out.println("values :: " + gm1.getValuess());
+			System.out.println("values :: " + gm1.getDates());
+
+			/*
+			 * String date1=gm1.getDates(); String[] date2=date1.split(",");
+			 * String dateUpdate=""; System.out.println("");
+			 * 
+			 * for(int k=date2.length-1;k>=0;k--) {
+			 * System.out.println("value ::   "+date2[k]);
+			 * dateUpdate=dateUpdate+date2[k]+",";
+			 * 
+			 * }
+			 * 
+			 * System.out.println("****   "+dateUpdate);
+			 * if(dateUpdate.endsWith(",")) { int length =dateUpdate.length();
+			 * dateUpdate=dateUpdate.substring(0, length-1); }
+			 * System.out.println("****   "+dateUpdate);
+			 */
+
+			String value1 = gm1.getValuess();
+			String[] values2 = value1.split(",");
+
+			String valueUpdate = "";
+
+			for (int k = values2.length - 1; k >= 0; k--) {
+				System.out.println("value ::   " + values2[k]);
+				valueUpdate = valueUpdate + values2[k] + ",";
+			}
+
+			System.out.println("****   " + valueUpdate);
+			if (valueUpdate.endsWith(",")) {
+				int length = valueUpdate.length();
+				valueUpdate = valueUpdate.substring(0, length - 1);
+			}
+			System.out.println("****   " + valueUpdate);
+			/*
+			 * String valueUpdate2=method(valueUpdate);
+			 * System.out.println("valueUpdate 2 "+valueUpdate2);
+			 */
+		}
+
+		return list;
+	}
+
+	public static List getAwsStats(String userid) {
+		String query = "SELECT statsid, instanceid, tagName, tagValue, date, userid FROM `awsstatistics` where userid=?";
+		GraphModel gm = null;
+		List<AWSStatistics> list = DBUtils.getBeanList(Instance.class, query,
+				userid);
+		return list;
+
+	}
+
+	public static List getInstancesData(String userid) {
+		String query = "SELECT statsid, instanceid, tagName, tagValue, date, userid FROM `awsstatistics` where userid=?";
+		GraphModel gm = null;
+		List<AWSStatistics> list = DBUtils.getBeanList(AWSStatistics.class,
+				query, userid);
+		ModelMapper modelMapper = new ModelMapper();
+		List<Instance> instancesList = list
+				.stream()
+				.map(awsStatsModel -> modelMapper.map(awsStatsModel,
+						Instance.class)).collect(Collectors.toList());
+		System.out.println(" instances " + instancesList);
+
+		return instancesList;
+
+	}
+
+	public static List getDecisionData(String userId) {
+
+		String returnString = "SrNo &nbsp;&nbsp;  Instance ID &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;&nbsp; Last Use &nbsp;&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;  Action<br><br>";
+		List cpuu = new ArrayList<>();
+		List network = new ArrayList<>();
+		List Volume = new ArrayList<>();
+		List instanceId = new ArrayList<>();
+		List datess = new ArrayList<>();
+
+		String query = "SELECT statsid,tagName,max(event_date) as dates,instanceId,avg(tagValue) as tagValue FROM `awsstatistics` where userid="
+				+ userId
+				+ " and  tagName ='CPUUtilization' group by instanceId,LEFT(event_date, 1);";
+		GraphModel gm = null;
+		List list = DBUtils.getBeanList(GraphModel.class, query);
+		// l2=list;
+		System.out.println("list size:" + list.size());
+
+		for (int i = 0; i < list.size(); i++) {
+			GraphModel gm1 = (GraphModel) list.get(i);
+
+			String date = gm1.getDates();
+			datess.add(date);
+			String tagValue = gm1.getTagValue();
+			String intanceId = gm1.getInstanceId();
+			instanceId.add(intanceId);
+			System.out.println("tag value " + tagValue);
+			double cpu = StringHelper.n2d(tagValue);
+			cpuu.add(cpu);
+
+			/*
+			 * double dcpiu = ServerConstants.svm.getSVMPredication(new double[]
+			 * { cpu, 5, 2, 2 }); if (dcpiu == 0) { returnString +=
+			 * (i+1)+".&nbsp;  "
+			 * +intanceId+" &nbsp; "+date+"&nbsp; Optimal Use<br><br>"; } else {
+			 * returnString += (i+1)+".&nbsp;  "+intanceId+" &nbsp; "+date+
+			 * "&nbsp; Deallocate<br><br>"; }
+			 */
+		}
+		// System.out.println("cpu :: "+cpuu);
+		// System.out.println("cpu :: "+datess);
+		// System.out.println("cpu ::" +instanceId);
+		// String returnString1 =
+		// "SrNo &nbsp;  Instance ID &nbsp;  Last Use &nbsp;  Action<br><br>";
+		String query1 = "SELECT statsid,tagName,max(event_date) as dates,instanceId,sum(tagValue) as tagValue FROM `awsstatistics` where userid="
+				+ userId
+				+ " and tagName ='NetworkOut' group by instanceId,LEFT(event_date, 1)";
+
+		// GraphModel gm1 = null;
+		List list1 = DBUtils.getBeanList(GraphModel.class, query1);
+		System.out.println("list size:" + list1.size());
+
+		for (int i = 0; i < list1.size(); i++) {
+			GraphModel gm1 = (GraphModel) list1.get(i);
+
+			String date = gm1.getDates();
+			String tagValue = gm1.getTagValue();
+
+			String intanceId = gm1.getInstanceId();
+			double networkk = StringHelper.n2d(tagValue);
+			network.add(networkk);
+
+			/*
+			 * double dcpiu = ServerConstants.svm.getSVMPredication(new double[]
+			 * { cpu, 5, 2, 2 }); if (dcpiu == 0) { returnString +=
+			 * (i+1)+".&nbsp;  "
+			 * +intanceId+" &nbsp; "+date+"&nbsp; Optimal Use<br><br>"; } else {
+			 * returnString += (i+1)+".&nbsp;  "+intanceId+" &nbsp; "+date+
+			 * "&nbsp; Deallocate<br><br>"; }
+			 */
+		}
+		System.out.println("cpu :: " + network);
+		// String returnString2 =
+		// "SrNo &nbsp;  Instance ID &nbsp;  Last Use &nbsp;  Action<br><br>";
+		String query2 = "SELECT statsid,tagName,max(event_date) as dates,instanceId,sum(tagValue) as tagValue FROM `awsstatistics` where userid="
+				+ userId
+				+ " and tagName ='VolumeWriteOps' group by instanceId,LEFT(event_date, 1)";
+		// GraphModel gm1 = null;
+		List list2 = DBUtils.getBeanList(GraphModel.class, query2);
+		System.out.println("list size:" + list2.size());
+
+		for (int i = 0; i < list2.size(); i++) {
+			GraphModel gm1 = (GraphModel) list2.get(i);
+
+			String date = gm1.getDates();
+			String tagValue = gm1.getTagValue();
+			String intanceId = gm1.getInstanceId();
+			double volume = StringHelper.n2d(tagValue);
+			Volume.add(volume);
+
+			/*
+			 * double dcpiu = ServerConstants.svm.getSVMPredication(new double[]
+			 * { cpu, 5, 2, 2 }); if (dcpiu == 0) { returnString +=
+			 * (i+1)+".&nbsp;  "
+			 * +intanceId+" &nbsp; "+date+"&nbsp; Optimal Use<br><br>"; } else {
+			 * returnString += (i+1)+".&nbsp;  "+intanceId+" &nbsp; "+date+
+			 * "&nbsp; Deallocate<br><br>"; }
+			 */
+		}
+		// System.out.println(" cpu "+cpuu);
+		// System.out.println("cpu "+network);
+		// System.out.println(Volume);
+		// / System.out.println(instanceId);
+		List sendData = new ArrayList();
+
+		try {
+			for (int ii = 0; ii < instanceId.size(); ii++) {
+				//
+				System.out.println("***");
+				double cpu = (Double) cpuu.get(ii);
+				GraphModel gmsend = new GraphModel();
+				double net = (Double) network.get(ii);
+				double vol = (Double) Volume.get(ii);
+				String intanceId = (String) instanceId.get(ii);
+				String date = (String) datess.get(ii);
+				try {
+					double dcpiu = ServerConstants.svm
+							.getSVMPredication(new double[] { cpu, 5, vol, net });
+					System.out
+							.println("******************************************************************");
+					System.out.println("cpu, 5, vol, net " + cpu + " - " + 5
+							+ " - " + vol + " - " + net);
+					if (dcpiu == 0) {
+						returnString = "Optimal Use";
+					} else {
+						returnString = "Deallocate";
+					}
+					System.out.println("returnString " + returnString);
+					// return returnString;
+					gmsend.setDecision(returnString);
+				} catch (Exception e) {
+					e.printStackTrace();
+					gmsend.setDecision("NA");
+				}
+				gmsend.setInstanceId(intanceId);
+				gmsend.setDates(date);
+				// String cpu1=Double.toString(cpu);
+				// String vol1=Double.toString(vol);
+				// String net1=Double.toString(net);
+				gmsend.setCpu(cpu);
+				gmsend.setVal(vol);
+				gmsend.setNet(net);
+				// gmsend.setDecision(dcpiu);
+				sendData.add(gmsend);
+
+				System.out
+						.println("******************************************************************");
+
+				/*
+				 * if (dcpiu == 0) { returnString +=
+				 * (ii+1)+".&nbsp;  "+intanceId+" &nbsp; "
+				 * +date+"&nbsp; Optimal Use<br><br>"; } else { returnString +=
+				 * (ii+1 )+".&nbsp;  "+intanceId+" &nbsp; "+date+
+				 * "&nbsp; Deallocate<br><br>" ; }
+				 * System.out.println("returnString "+returnString); //return
+				 * returnString; }
+				 */
+
+			}
+		} catch (Exception e) {
+			// TODO: handle exception
+			e.printStackTrace();
+		}
+
+		// System.out.println(sendData);
+		return sendData;
+	}
+
+	public static void closeConnection(Connection conn) {
+		try {
+			conn.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+	}
+
+	public static String method(String str) {
+		if (str != null && str.length() > 0
+				&& str.charAt(str.length() - 1) == 'x') {
+			str = str.substring(0, str.length() - 1);
+		}
+		return str;
+	}
+
+}

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;AwsCloudability/WebContent/pages/amazone.jsp&apos; to &apos;example.jsp&apos;" description="Rename resource &apos;amazone.jsp&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="WebContent/pages/amazone.jsp" name="example.jsp" stamp="1579696118198" updateReferences="true"/>
+</session>
